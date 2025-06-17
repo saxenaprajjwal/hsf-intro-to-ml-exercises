@@ -444,8 +444,6 @@ def create_decision_boundary_mesh_nn(func, x1_range, x2_range):
     features_mesh = np.column_stack([
         x1_vals,           # Feature 0: size (scaled)
         x2_vals,           # Feature 1: price (scaled)  
-        x1_vals ** 2,      # Feature 2: size^2
-        x2_vals ** 2       # Feature 3: price^2
     ])
     
     # Get predictions and reshape
