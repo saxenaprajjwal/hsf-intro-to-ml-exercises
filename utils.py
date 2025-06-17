@@ -415,3 +415,134 @@ def animate_logistic_regression(features, labels, weights_history, bias_history,
     
     plt.show()
     return anim
+
+
+def create_decision_boundary_mesh_nn(func, x1_range, x2_range):
+    """
+    Create a mesh grid and compute neural network predictions for decision boundary
+    
+    Parameters:
+    - nn: neural network with current weights
+    - x1_range: [min, max] for first feature (size)  
+    - x2_range: [min, max] for second feature (price)
+    
+    Returns:
+    - X1_mesh, X2_mesh: meshgrid coordinates
+    - Z: neural network predictions (probabilities - 0.5 for boundary)
+    """
+    # Create mesh grid
+    x1 = np.linspace(x1_range[0], x1_range[1], 100)
+    x2 = np.linspace(x2_range[0], x2_range[1], 100)
+    X1_mesh, X2_mesh = np.meshgrid(x1, x2)
+    
+    # Create features for mesh points (same as training features)
+    mesh_points = np.c_[X1_mesh.ravel(), X2_mesh.ravel()]
+    x1_vals = mesh_points[:, 0]
+    x2_vals = mesh_points[:, 1]
+    
+    # Create feature matrix matching training data format
+    features_mesh = np.column_stack([
+        x1_vals,           # Feature 0: size (scaled)
+        x2_vals,           # Feature 1: price (scaled)  
+        x1_vals ** 2,      # Feature 2: size^2
+        x2_vals ** 2       # Feature 3: price^2
+    ])
+    
+    # Get predictions and reshape
+    predictions = func(features_mesh)
+    Z = (predictions - 0.5).reshape(X1_mesh.shape)  # Center around 0 for contour
+    
+    return X1_mesh, X2_mesh, Z
+
+
+def animate_neural_network(
+    features, lamdas, labels, loss_history, feature_names, 
+    plot_every=1, save_path=None
+):
+    """Create animation of neural network training"""
+    plot_every = int(plot_every)
+    lamdas = lamdas[::plot_every]  # Downsample labels for animation
+    loss_history = loss_history[::plot_every]  # Downsample loss history
+
+    apartments = labels == 0
+    houses = labels == 1
+    
+    # Use first two features for plotting (size and price - scaled)
+    x1_data = features[:, 0]  # size (scaled)
+    x2_data = features[:, 1]  # price (scaled)
+    
+    # Set up the figure and axes
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+    
+    # Define plot ranges
+    x1_margin = (x1_data.max() - x1_data.min()) * 0.1
+    x2_margin = (x2_data.max() - x2_data.min()) * 0.1
+    x1_range = [x1_data.min() - x1_margin, x1_data.max() + x1_margin]
+    x2_range = [x2_data.min() - x2_margin, x2_data.max() + x2_margin]
+    
+    # Plot 1: Decision boundary in feature space
+    ax1.scatter(x1_data[apartments], x2_data[apartments],
+                color='blue', alpha=0.7, s=60, label='Apartments', edgecolor='darkblue')
+    ax1.scatter(x1_data[houses], x2_data[houses], 
+                color='red', alpha=0.7, s=60, label='Houses', edgecolor='darkred')
+    
+    # Store contour collections for cleanup
+    contour_collections = []
+    
+    ax1.set_xlim(x1_range[0], x1_range[1])
+    ax1.set_ylim(x2_range[0], x2_range[1])
+    ax1.set_xlabel(f'{feature_names[0]} (scaled)', fontsize=12)
+    ax1.set_ylabel(f'{feature_names[1]} (scaled)', fontsize=12)
+    ax1.set_title('Neural Network Decision Boundary Evolution', fontsize=14)
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+    
+    # Plot 2: Loss history
+    loss_line, = ax2.plot([], [], 'blue', linewidth=2)
+    ax2.set_xlim(0, len(loss_history)*plot_every)
+    ax2.set_ylim(min(loss_history) * 0.95, max(loss_history) * 1.05)
+    ax2.set_xlabel('Iteration', fontsize=12)
+    ax2.set_ylabel('Loss', fontsize=12)
+    ax2.set_title('Training Loss', fontsize=14)
+    ax2.grid(True, alpha=0.3)
+        
+    # Animation function
+    def animate(frame):
+        # Clear previous contour
+        for contour_set in contour_collections:
+            for collection in contour_set.collections:
+                collection.remove()
+        contour_collections.clear()
+                
+        # Update decision boundary
+        X1_mesh, X2_mesh, Z = create_decision_boundary_mesh_nn(lamdas[frame], x1_range, x2_range)
+        
+        # Draw decision boundary (where Z = 0, i.e., probability = 0.5)
+        contour = ax1.contour(X1_mesh, X2_mesh, Z, levels=[0], colors=['green'], linewidths=3)
+        contour_collections.append(contour)
+        
+        # Update loss plot
+        loss_line.set_data([e*plot_every for e in range(frame + 1)], loss_history[:frame + 1])
+        
+        # Update titles
+        ax1.set_title(f'Neural Network Decision Boundary (Iteration {frame*plot_every})', fontsize=14)
+        ax2.set_title(f'Training Loss (Current: {loss_history[frame]:.4f})', fontsize=14)
+        
+        return loss_line,
+    
+    # Create animation
+    frames = len(loss_history)
+    interval = max(100, len(loss_history) // frames * 50)
+    
+    anim = FuncAnimation(fig, animate, frames=frames, interval=interval,
+                                 blit=False, repeat=True)
+    
+    plt.tight_layout()
+    
+    if save_path:
+        print(f"Saving animation to {save_path}...")
+        anim.save(save_path, writer='ffmpeg', fps=10, bitrate=1800)
+        print("Animation saved!")
+    
+    # plt.show()
+    return anim
