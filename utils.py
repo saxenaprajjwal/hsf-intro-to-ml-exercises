@@ -374,9 +374,14 @@ def animate_logistic_regression(features, labels, weights_history, bias_history,
     # Animation function
     def animate(frame):
         # Clear previous contour
-        for collection in contour_collections:
-            for path in collection.collections:
-                path.remove()
+        # for collection in contour_collections:
+        #     for path in collection.collections:
+        #         path.remove()
+        
+        for contour_set in contour_collections:
+            for collection in contour_set.collections:  # ✅ Correct
+                collection.remove()
+        
         contour_collections.clear()
         
         # Update decision boundary
